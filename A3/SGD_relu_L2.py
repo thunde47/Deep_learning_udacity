@@ -55,7 +55,9 @@ with sess.as_default():
 	logits1=tf.nn.relu(tf.matmul(tf_X_train,W12)+b12)
 	logits2=tf.matmul(logits1,W23)+b23
 	loss=tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits2,tf_y_train))+beta1*tf.nn.l2_loss(W12)+beta2*tf.nn.l2_loss(W23)
-	trainer=tf.train.GradientDescentOptimizer(0.5).minimize(loss)
+	global_step=tf.Variable(0)
+	learning_rate=tf.train.exponential_decay(0.25,global_step,1000,.96,staircase=True)
+	trainer=tf.train.GradientDescentOptimizer(learning_rate).minimize(loss,global_step=global_step)
 	
 	train_prediction=tf.nn.softmax(logits2)
 	val_prediction=tf.nn.softmax(tf.matmul(tf.nn.relu(tf.matmul(tf_X_val,W12)+b12),W23)+b23)
