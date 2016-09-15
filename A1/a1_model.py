@@ -6,7 +6,7 @@ import numpy as np
 
 print("Reading the pickled file...")
 datasets=[]
-with (open("notMNIST.pickle","rb")) as openfile:
+with (open("../notMNIST.pickle","rb")) as openfile:
 	while True:
 		try:
 			datasets.append(pickle.load(openfile))
@@ -31,9 +31,9 @@ for train_image in datasets[0]['train_dataset'][0:n]:
 	test_image_num=test_image_num+1	
 print("Total duplicates %s"%duplicate)
 '''
-datasets[0]['train_dataset']=datasets[0]['train_dataset'][0:10000,:,:]
+datasets[0]['train_dataset']=datasets[0]['train_dataset'][0:1000,:,:]
 datasets[0]['test_dataset']=datasets[0]['test_dataset'][0:1000,:,:]
-datasets[0]['train_labels']=datasets[0]['train_labels'][0:10000]
+datasets[0]['train_labels']=datasets[0]['train_labels'][0:1000]
 datasets[0]['test_labels']=datasets[0]['test_labels'][0:1000]
 X_train=np.zeros((datasets[0]['train_dataset'].shape[0],28*28))
 X_test=np.zeros((datasets[0]['test_dataset'].shape[0],28*28))

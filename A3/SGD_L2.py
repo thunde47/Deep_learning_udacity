@@ -33,7 +33,7 @@ def accuracy(predictions,labels):
 	return 100.0*np.sum(np.argmax(predictions,1)==np.argmax(labels,1))/predictions.shape[0]
 
 print("Creating tensorflow graph...")
-train_subset=10000
+#train_subset=10000
 num_classes=10
 num_iterations=3000
 batch_size=128

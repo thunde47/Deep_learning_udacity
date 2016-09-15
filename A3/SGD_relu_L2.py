@@ -33,20 +33,19 @@ def accuracy(predictions,labels):
 	return 100.0*np.sum(np.argmax(predictions,1)==np.argmax(labels,1))/predictions.shape[0]
 
 print("Creating tensorflow graph...")
-train_subset=10000
+batch_size=128
+#train_subset=10000
 num_classes=10
 num_iterations=3000
-batch_size=128
 hidden_layer_neurons=1024
 beta1=.005
-beta2=.005
+beta2=.001
 sess=tf.Session()
 with sess.as_default():
 	tf_X_train=tf.placeholder(tf.float32,shape=(batch_size,image_size*image_size))
 	tf_X_test=tf.constant(X_test,tf.float32)
 	tf_X_val=tf.constant(X_val,tf.float32)
 	tf_y_train=tf.placeholder(tf.float32,shape=(batch_size,num_classes))
-	
 	
 	W12=tf.Variable(tf.random_normal((image_size*image_size,hidden_layer_neurons)))
 	b12=tf.Variable(tf.zeros([hidden_layer_neurons]))

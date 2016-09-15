@@ -35,7 +35,7 @@ def accuracy(predictions,labels):
 print("Creating tensorflow graph...")
 train_subset=10000
 num_classes=10
-num_iterations=5000
+num_iterations=3000
 batch_size=128
 sess=tf.Session()
 with sess.as_default():
@@ -61,7 +61,7 @@ with sess.as_default():
 		offset=(batch_size*iteration)%(y_train.shape[0]-batch_size)
 		feed_dict={tf_X_train:X_train[offset:(offset+batch_size),:],tf_y_train:y_train[offset:(offset+batch_size),:]}
 		_,l,predictions=sess.run([trainer,loss,train_prediction],feed_dict=feed_dict)
-		if (iteration%100==0):
+		if (iteration%250==0):
 			print("Minibath Loss at step %d: %f" %(iteration,l))
 			print("Minibatch Training accuracy: %.1f" %accuracy(predictions,y_train[offset:(offset+batch_size),:]))
 			print("validation accuracy: %.1f" %accuracy(val_prediction.eval(),y_val))
