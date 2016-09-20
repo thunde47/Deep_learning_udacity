@@ -79,20 +79,20 @@ with graph.as_default():
   layer4_weights = tf.Variable(tf.truncated_normal(
       [num_hidden, num_labels], stddev=0.1))
   layer4_biases = tf.Variable(tf.constant(1.0, shape=[num_labels]))
-  
+  keep_prob=tf.placeholder(tf.float32)
   def model(data):
-    keep_prob=tf.placeholder(tf.float32)
+    
     conv1 = tf.nn.conv2d(data, layer1_weights,strides=[1,1,1,1],padding='SAME')
     hidden = tf.nn.relu(conv1 + layer1_biases)
-    hidden_pool1=tf.dropout(tf.nn.max_pool(hidden,ksize=[1,2,2,1],strides=[1,2,2,1],padding='SAME'),keep_prob=0.5)
+    hidden_pool1=tf.nn.max_pool(hidden,ksize=[1,2,2,1],strides=[1,2,2,1],padding='SAME')
     #print("conv layer 1 - ",hidden_pool1.get_shape().as_list())
     conv2 = tf.nn.conv2d(hidden_pool1, layer2_weights,strides=[1,1,1,1],padding='SAME')
     hidden = tf.nn.relu(conv2 + layer2_biases)
-    hidden_pool2=tf.dropout(tf.nn.max_pool(hidden,ksize=[1,2,2,1],strides=[1,2,2,1],padding='SAME'),keep_prob=0.5)
+    hidden_pool2=tf.nn.max_pool(hidden,ksize=[1,2,2,1],strides=[1,2,2,1],padding='SAME')
     #print("conv layer 1 - ",hidden_pool2.get_shape().as_list())
     shape = tf.shape(hidden_pool2)    
     reshape = tf.reshape(hidden_pool2, [shape[0], shape[1] * shape[2] * shape[3]])
-    hidden = tf.dropout(tf.nn.relu(tf.matmul(reshape, layer3_weights) + layer3_biases),keep_prob)
+    hidden = tf.nn.dropout(tf.nn.relu(tf.matmul(reshape, layer3_weights) + layer3_biases),keep_prob)
     #print("fully connected layer - ",hidden.get_shape().as_list())
     return tf.matmul(hidden, layer4_weights) + layer4_biases
   
@@ -122,8 +122,8 @@ with tf.Session(graph=graph) as session:
 
     feed_dict_train = {tf_train_dataset : batch_data, tf_train_labels : batch_labels,keep_prob:0.5}
     feed_dict_train_eval = {tf_train_dataset : batch_data, tf_train_labels : batch_labels,keep_prob:1.0}
-    feed_dict_test = {tf_train_dataset : test_dataset, tf_train_labels : test_labels,keep_prob=1.0}
-    feed_dict_valid = {tf_train_dataset : valid_dataset, tf_train_labels : valid_labels,keep_prob=1.0}
+    feed_dict_test = {tf_train_dataset : test_dataset, tf_train_labels : test_labels,keep_prob:1.0}
+    feed_dict_valid = {tf_train_dataset : valid_dataset, tf_train_labels : valid_labels,keep_prob:1.0}
 
     _, l, predictions = session.run([optimizer, loss, train_prediction], feed_dict=feed_dict_train)
     if (step % 50 == 0):
