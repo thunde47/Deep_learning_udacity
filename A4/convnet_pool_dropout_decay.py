@@ -103,7 +103,7 @@ with graph.as_default():
     
   # Optimizer.
   global_step=tf.Variable(0)
-  learning_rate=tf.train.exponential_decay(.05,global_step,250,.96,staircase=True)
+  learning_rate=tf.train.exponential_decay(.05,global_step,100,.98,staircase=True)
   optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss,global_step=global_step)
   
   # Predictions for the training, validation, and test data.
@@ -112,7 +112,7 @@ with graph.as_default():
   accuracy=100.0*tf.reduce_mean(tf.cast(correct_prediction,tf.float32))
  
 
-num_steps=1001
+num_steps=5001
 with tf.Session(graph=graph) as session:
   tf.initialize_all_variables().run()
   print('Initialized all the variables')
@@ -128,7 +128,7 @@ with tf.Session(graph=graph) as session:
     feed_dict_valid = {tf_train_dataset : valid_dataset, tf_train_labels : valid_labels,keep_prob:1.0}
 
     _, l, predictions = session.run([optimizer, loss, train_prediction], feed_dict=feed_dict_train)
-    if (step % 50 == 0):
+    if (step % 100 == 0):
       print("-----------------------------------")
       print('Minibatch loss at step %d: %f' % (step, l))
       print("Learning rate=%.4f"%learning_rate.eval())
