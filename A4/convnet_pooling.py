@@ -32,13 +32,16 @@ num_channels=1
 train_dataset=train_dataset.reshape(-1,image_size,image_size,num_channels).astype(np.float32)
 test_dataset=test_dataset.reshape(-1,image_size,image_size,num_channels).astype(np.float32)
 valid_dataset=valid_dataset.reshape(-1,image_size,image_size,num_channels).astype(np.float32)
-
+test_dataset=test_dataset[0:5000,:]
+valid_dataset=valid_dataset[0:5000,:]
 print("One hot encoding the class labels...")
 #One hot encoding the data
 enc=OneHotEncoder()
 train_labels=enc.fit_transform(train_labels.reshape(-1,1)).toarray()
 test_labels=enc.fit_transform(test_labels.reshape(-1,1)).toarray()
 valid_labels=enc.fit_transform(valid_labels.reshape(-1,1)).toarray()
+test_labels=test_labels[0:5000,:]
+valid_labels=valid_labels[0:5000,:]
 
 '''
 print(X_train.shape,y_train.shape)
@@ -50,18 +53,30 @@ patch_size = 5
 depth = 16
 num_hidden = 64
 num_labels=10
-def accuracy(predictions, labels):
-  return (100.0 * np.sum(np.argmax(predictions, 1) == np.argmax(labels, 1))
-          / predictions.shape[0])
+
+def model(data):
+  
+  conv1 = tf.nn.conv2d(data, layer1_weights,strides=[1,1,1,1],padding='SAME')
+  hidden = tf.nn.relu(conv1 + layer1_biases)
+  hidden_pool1=tf.nn.max_pool(hidden,ksize=[1,2,2,1],strides=[1,2,2,1],padding='SAME')
+  #print("conv layer 1 - ",hidden_pool1.get_shape().as_list())
+  conv2 = tf.nn.conv2d(hidden_pool1, layer2_weights,strides=[1,1,1,1],padding='SAME')
+  hidden = tf.nn.relu(conv2 + layer2_biases)
+  hidden_pool2=tf.nn.max_pool(hidden,ksize=[1,2,2,1],strides=[1,2,2,1],padding='SAME')
+  #print("conv layer 1 - ",hidden_pool2.get_shape().as_list())
+  shape = tf.shape(hidden_pool2)    
+  reshape = tf.reshape(hidden_pool2, [shape[0], shape[1] * shape[2] * shape[3]])
+  hidden = tf.nn.relu(tf.matmul(reshape, layer3_weights) + layer3_biases)
+  #print("fully connected layer - ",hidden.get_shape().as_list())
+  return tf.matmul(hidden, layer4_weights) + layer4_biases
 
 graph = tf.Graph()
 
 with graph.as_default():
 
   # Input data.
-  tf_train_dataset = tf.placeholder(
-    tf.float32, shape=(batch_size, image_size, image_size, num_channels))
-  tf_train_labels = tf.placeholder(tf.float32, shape=(batch_size, num_labels))
+  tf_train_dataset = tf.placeholder(tf.float32,shape=(None, image_size, image_size, num_channels))
+  tf_train_labels = tf.placeholder(tf.float32,shape=(None, num_labels))
   tf_valid_dataset = tf.constant(valid_dataset)
   tf_test_dataset = tf.constant(test_dataset)
   
@@ -79,53 +94,42 @@ with graph.as_default():
       [num_hidden, num_labels], stddev=0.1))
   layer4_biases = tf.Variable(tf.constant(1.0, shape=[num_labels]))
   
-  # Model.
-  def model(data):
-    conv1 = tf.nn.conv2d(data, layer1_weights,strides=[1,1,1,1],padding='SAME')
-    hidden = tf.nn.relu(conv1 + layer1_biases)
-    hidden_pool1=tf.nn.max_pool(hidden,ksize=[1,2,2,1],strides=[1,2,2,1],padding='SAME')
-    print("conv layer 1 - ",hidden_pool1.get_shape().as_list())
-    conv2 = tf.nn.conv2d(hidden_pool1, layer2_weights,strides=[1,1,1,1],padding='SAME')
-    hidden = tf.nn.relu(conv2 + layer2_biases)
-    hidden_pool2=tf.nn.max_pool(hidden,ksize=[1,2,2,1],strides=[1,2,2,1],padding='SAME')
-    print("conv layer 1 - ",hidden_pool2.get_shape().as_list())
-    shape = hidden_pool2.get_shape().as_list()
-    reshape = tf.reshape(hidden_pool2, [shape[0], shape[1] * shape[2] * shape[3]])
-    hidden = tf.nn.relu(tf.matmul(reshape, layer3_weights) + layer3_biases)
-    print("fully connected layer - ",hidden.get_shape().as_list())
-    return tf.matmul(hidden, layer4_weights) + layer4_biases
+  
   
   # Training computation.
   logits = model(tf_train_dataset)
-  loss = tf.reduce_mean(
-    tf.nn.softmax_cross_entropy_with_logits(logits, tf_train_labels))
+  loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits, tf_train_labels))
     
   # Optimizer.
   optimizer = tf.train.GradientDescentOptimizer(0.05).minimize(loss)
   
   # Predictions for the training, validation, and test data.
   train_prediction = tf.nn.softmax(logits)
-  valid_prediction = tf.nn.softmax(model(tf_valid_dataset))
-  test_prediction = tf.nn.softmax(model(tf_test_dataset))
+  correct_prediction=tf.equal(tf.argmax(train_prediction,1),tf.argmax(tf_train_labels,1))
+  accuracy=100.0*tf.reduce_mean(tf.cast(correct_prediction,tf.float32))
+ 
 
-num_steps=201
+num_steps=1001
 with tf.Session(graph=graph) as session:
   tf.initialize_all_variables().run()
-  print('Initialized')
+  print('Initialized all the variables')
+  
   for step in range(num_steps):
     offset = (step * batch_size) % (train_labels.shape[0] - batch_size)
     batch_data = train_dataset[offset:(offset + batch_size), :, :, :]
     batch_labels = train_labels[offset:(offset + batch_size), :]
-    feed_dict = {tf_train_dataset : batch_data, tf_train_labels : batch_labels}
-    _, l, predictions = session.run(
-      [optimizer, loss, train_prediction], feed_dict=feed_dict)
+
+    feed_dict_train = {tf_train_dataset : batch_data, tf_train_labels : batch_labels}
+    feed_dict_test = {tf_train_dataset : test_dataset, tf_train_labels : test_labels}
+    feed_dict_valid = {tf_train_dataset : valid_dataset, tf_train_labels : valid_labels}
+
+    _, l, predictions = session.run([optimizer, loss, train_prediction], feed_dict=feed_dict_train)
     if (step % 50 == 0):
+      print("-----------------------------------")
       print('Minibatch loss at step %d: %f' % (step, l))
-      print('Minibatch accuracy: %.1f%%' % accuracy(predictions, batch_labels))
-      
-      print('Validation accuracy: %.1f%%' % accuracy(
-        valid_prediction.eval(), valid_labels))
-  print('Test accuracy: %.1f%%' % accuracy(test_prediction.eval(), test_labels))
+      print('Minibatch accuracy: %.1f%%' % accuracy.eval(feed_dict=feed_dict_train))
+      print('Validation accuracy: %.1f%%' % accuracy.eval(feed_dict=feed_dict_valid))
+  print('Test accuracy: %.1f%%' % accuracy.eval(feed_dict=feed_dict_test))
 	
 
 
