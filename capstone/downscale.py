@@ -9,7 +9,7 @@ for i in range(33401):
 	with open('train/'+image_name, 'r+b') as f:
 		with Image.open(f) as image:
 			cover=resizeimage.resize_cover(image,[width,height],validate=False)
-			cover.save('train_mod/'+image_name,image.format)
+			cover.save('train_mod_'+str(width)+'x'+str(height)+'/'+image_name,image.format)
 
 
 

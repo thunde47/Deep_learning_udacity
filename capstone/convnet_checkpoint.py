@@ -4,34 +4,14 @@ from sklearn.preprocessing import OneHotEncoder
 import tensorflow as tf
 import os.path
 
-
-print("Un-achaarifying the data...")
-achaar_file='svhn.pickle'
-with open(achaar_file,'rb') as f:
-	save=pickle.load(f)
-	train_dataset=save['train_dataset']
-	train_target=save['train_target']
-	test_dataset=save['test_dataset']
-	test_target=save['test_target']
-	del save
-
-print("One hot encoding the targets...")
+TRAIN_FLAG=True
 target_number=1
-enc=OneHotEncoder()
-#this is wrong way of encoding. shud be in achaar.py. test and train can have different encodings
-train_labels=enc.fit_transform(train_target[target_number].reshape(-1,1)).toarray()
-test_labels=enc.fit_transform(test_target[target_number].reshape(-1,1)).toarray()
-print(train_dataset.shape)
-print(train_labels.shape)
-print(test_dataset.shape)
-print(test_labels.shape)
-
-TRAIN_FLAG=False
 batch_size = 16
 patch_size = 3
 depth = 32
 num_hidden = 16
-num_labels=len(train_labels[0])
+#num_labels=len(train_labels[0])
+num_labels=10
 num_channels=3
 width=128
 height=64
@@ -93,6 +73,23 @@ with tf.Session(graph=graph) as session:
 	
 	#if not os.path.exists("parameters.ckpt"):
 	if TRAIN_FLAG:
+		print("Un-achaarifying the training data...")
+		achaar_file='svhn.pickle'
+		with open(achaar_file,'rb') as f:
+			save=pickle.load(f)
+			train_dataset=save['train_dataset']
+			train_target=save['train_target']
+			del save
+
+		
+		
+		print("One hot encoding the training targets...")
+		
+		enc=OneHotEncoder()
+		#this is wrong way of encoding. shud be in achaar.py. test and train can have different encodings
+		train_labels=enc.fit_transform(train_target[target_number].reshape(-1,1)).toarray()
+		print(train_dataset.shape)
+		print(train_labels.shape)
 		print("Training network...")
 		for step in range(iterations):
 			offset = (step * batch_size) % (train_labels.shape[0] - batch_size)
@@ -114,7 +111,23 @@ with tf.Session(graph=graph) as session:
 	else:
 		print("Using trained parameters for prediction...")
 		saver_global.restore(session, "parameters.ckpt")
+
+		print("Un-achaarifying the test data...")
+		achaar_file='svhn.pickle'
+		with open(achaar_file,'rb') as f:
+			save=pickle.load(f)
+			
+			test_dataset=save['test_dataset']
+			test_target=save['test_target']
+			del save
 		
+
+		print("One hot encoding the test targets...")
+		enc=OneHotEncoder()
+		#this is wrong way of encoding. shud be in achaar.py. test and train can have different encodings
+		test_labels=enc.fit_transform(test_target[target_number].reshape(-1,1)).toarray()
+		print(test_dataset.shape)
+		print(test_labels.shape)
 		feed_dict_test = {tf_train_dataset : test_dataset, tf_train_labels : test_labels, keep_prob:1.0}
 		test_prediction=session.run([train_prediction],feed_dict=feed_dict_test)
 		#print('Test prediction:', test_prediction[0])
