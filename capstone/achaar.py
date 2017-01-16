@@ -3,13 +3,13 @@ from PIL import Image
 import scipy.io as sio
 from six.moves import cPickle as pickle
 from scipy.ndimage.filters import uniform_filter
+from sklearn.preprocessing import OneHotEncoder
 
 total_images=33401
 images_used=8000
 width=128
 height=64
 image_path='train_mod_'+str(width)+'x'+str(height)+'/'
-
 
 struct=sio.loadmat('train/digitStruct_v7.mat')
 lengths=np.zeros(images_used)
@@ -58,7 +58,6 @@ def window_stdev(arr,radius):
 mean=np.mean(dataset)
 stddev=np.std(dataset)
 
-
 #stddev=window_stdev((np.asarray(dataset)).reshape(images_used*width*height*3),20)	
 #print((np.asarray(dataset)).reshape(images_used*width*height*3))
 print('standard deviation=',stddev)
@@ -70,16 +69,22 @@ train_target=[]
 test_target=[]
 train_dataset=dataset[0:training_samples]
 test_dataset=dataset[training_samples:total_images]
+print("One hot encoding the labels...")
 for i in range(6):
-	train_target.append(target[i][0:training_samples])
-	test_target.append(target[i][training_samples:total_images])
+	enc=OneHotEncoder()
+	target_enc=enc.fit_transform(target[i].reshape(-1,1)).toarray()	
+	train_target.append(target_enc[0:training_samples])
+	test_target.append(target_enc[training_samples:total_images])
+
 print(train_dataset.shape)
+print(train_target[0].shape)
 print(test_dataset.shape)
+print(test_target[0].shape)
 
 achaar_file = 'svhn.pickle'
 try:
   f = open(achaar_file, 'wb')
-  save = {
+  save = {		
     'train_dataset': train_dataset,
     'train_target': train_target,
 	'test_dataset': test_dataset,
