@@ -5,8 +5,9 @@ import tensorflow as tf
 import os.path
 import numpy as np
 
-TRAIN_FLAG=False
-target_number=2
+restore=True
+iterations=100
+
 batch_size = 16
 patch_size = 3
 depth = 32
@@ -19,22 +20,21 @@ achaar_file='svhn.pickle'
 with open(achaar_file,'rb') as f:
 	save=pickle.load(f)
 	all_labels=save['all_labels']
-	if TRAIN_FLAG:
-		print("Un-achaarifying the training data...")
+	if not restore:
+		print("Un-achaarifying the training data...\n")
 		train_dataset=save['train_dataset']
-		train_target=save['train_target']
+		train_target=save['train_target']		
 	else:
-		print("Un-achaarifying the test data...")
+		print("Un-achaarifying the test data...\n")
 		test_dataset=save['test_dataset']
 		test_target=save['test_target']
 	del save
 
-print("Generating graph...")
+print("Generating graph...\n")
 graph=tf.Graph()
 with graph.as_default():
-	#Setting placeholders for datasets
-	#tf_num_labels=tf.placeholder(tf.int32)
-	for target_number in range(len(all_labels)):
+	
+	for target_number in range(len(all_labels)-5):
 		
 		num_labels=all_labels[target_number]
 		tf_train_dataset=tf.placeholder(tf.float32, shape=(None, height, width, num_channels))
@@ -42,6 +42,7 @@ with graph.as_default():
 
 		#Defining layers, weights and biases
 		layer1_weights=tf.Variable(tf.truncated_normal([patch_size,patch_size, num_channels, depth], stddev=0.1))
+		#layer1_biases=tf.Variable(tf.zeros([depth]))
 		layer1_biases=tf.Variable(tf.zeros([depth]))
 
 		layer2_weights=tf.Variable(tf.truncated_normal([patch_size, patch_size,depth,depth],stddev=0.1))
@@ -54,20 +55,20 @@ with graph.as_default():
 		layer4_biases=tf.Variable(tf.constant(1.0, shape=[num_labels]))
 	
 		keep_prob=tf.placeholder(tf.float32)
-		saver_global = tf.train.Saver()
 		def model(data):
-			conv1 = tf.nn.conv2d(data, layer1_weights, [1, 1, 1, 1], padding='SAME')
-			hidden1 = tf.nn.relu(conv1 + layer1_biases)
+			conv1 = tf.nn.conv2d(tf_train_dataset, layer1_weights, [1, 1, 1, 1], padding='SAME')
+			hidden1 = tf.nn.tanh(conv1 + layer1_biases)
 			hidden_pool1=tf.nn.max_pool(hidden1,ksize=[1,2,2,1],strides=[1,2,2,1],padding='SAME')
 			#print("conv layer 1 - ",hidden_pool1.get_shape().as_list())
 			conv2 = tf.nn.conv2d(hidden_pool1, layer2_weights, [1, 1, 1, 1], padding='SAME')
-			hidden2 = tf.nn.relu(conv2 + layer2_biases)
+			hidden2 = tf.nn.tanh(conv2 + layer2_biases)
 			hidden_pool2=tf.nn.max_pool(hidden2,ksize=[1,2,2,1],strides=[1,2,2,1],padding='SAME')
 			#shape = hidden.get_shape().as_list()
 			shape=tf.shape(hidden_pool2)
 			#print("conv layer 2 - ",hidden_pool2.get_shape().as_list())
 			reshape = tf.reshape(hidden_pool2, [shape[0], shape[1] * shape[2] * shape[3]])
-			hidden = tf.nn.dropout(tf.tanh(tf.matmul(reshape, layer3_weights) + layer3_biases),keep_prob)
+			#hidden = tf.nn.dropout(tf.tanh(tf.matmul(reshape, layer3_weights) + layer3_biases),keep_prob)
+			hidden=	tf.nn.tanh(tf.matmul(reshape, layer3_weights) + layer3_biases)
 			#print("fully connected layer",hidden.get_shape().as_list())
 			return tf.matmul(hidden, layer4_weights) + layer4_biases
 
@@ -82,50 +83,82 @@ with graph.as_default():
 		train_prediction=tf.nn.softmax(logits)
 		correct_prediction=tf.equal(tf.argmax(train_prediction,1),tf.argmax(tf_train_labels,1))
 		accuracy=100.0*tf.reduce_mean(tf.cast(correct_prediction,tf.float32))
-
-		iterations=20
+		
+		
 		with tf.Session(graph=graph) as session:
-			tf.initialize_all_variables().run()
-	
+			saver=tf.train.Saver()	
 			#if not os.path.exists("parameters.ckpt"):
-			if TRAIN_FLAG:
-				print("Training network...")
+			if not restore:
+				print("Training network...\n")
+				tf.initialize_all_variables().run()
 				train_labels=train_target[target_number]
-			
 				for step in range(iterations):
+					
 					offset = (step * batch_size) % (train_labels.shape[0] - batch_size)
 					batch_data = train_dataset[offset:(offset + batch_size), :, :, :]
 					batch_labels = train_labels[offset:(offset + batch_size), :]
-		
+										
 					feed_dict_train = {tf_train_dataset : batch_data, tf_train_labels : batch_labels, keep_prob:0.5}
 					feed_dict_train_eval={tf_train_dataset : batch_data, tf_train_labels : batch_labels, keep_prob:1.0}
 					#feed_dict_test = {tf_train_dataset : test_dataset, tf_train_labels : test_labels, keep_prob:1.0}
 					_, l, predictions = session.run([optimizer, loss, train_prediction], feed_dict=feed_dict_train)
-					if (step % 10 == 0):
+					if (step % 1 == 0):
 						print('Minibatch loss at step %d: %f' %(step, l))
-						print('Minibatch accuracy: %.1f%%' % accuracy.eval(feed_dict=feed_dict_train_eval))			
-			
-				saver_local=tf.train.Saver()		
-				save_path = saver_local.save(session, "parameters_"+str(target_number)+".ckpt")
+						print('Minibatch accuracy: %.1f%%' % accuracy.eval(feed_dict=feed_dict_train_eval))		
+				save_path = saver.save(session, "parameters_"+str(target_number)+".ckpt")
 				print("Model saved in file: %s" % save_path)
 				#print('Test accuracy: %.1f%%' % accuracy.eval(feed_dict=feed_dict_test))
-	
+				
 			else:
-				print("Using trained parameters for prediction...")
-				saver_global.restore(session, "parameters_"+str(target_number)+".ckpt")		
+				print("Using trained parameters for prediction...\n")
+				new_saver=tf.train.import_meta_graph("parameters_"+str(target_number)+".ckpt.meta")
+				new_saver.restore(session, tf.train.latest_checkpoint('./'))
+				#keep_prob=1.0
 				test_labels=test_target[target_number]
-				print(test_dataset.shape)
-				print(test_labels.shape)
+				'''				
+				conv1 = tf.nn.conv2d(tf.cast(test_dataset,tf.float32), layer1_weights, [1, 1, 1, 1], padding='SAME')
+				hidden1 = tf.nn.tanh(conv1 + layer1_biases)				
+				hidden_pool1=tf.nn.max_pool(hidden1,ksize=[1,2,2,1],strides=[1,2,2,1],padding='SAME')
+				#print("conv layer 1 - ",hidden_pool1.get_shape().as_list())
+				conv2 = tf.nn.conv2d(hidden_pool1, layer2_weights, [1, 1, 1, 1], padding='SAME')
+				hidden2 = tf.nn.tanh(conv2 + layer2_biases)
+				hidden_pool2=tf.nn.max_pool(hidden2,ksize=[1,2,2,1],strides=[1,2,2,1],padding='SAME')
+				shape = hidden_pool2.get_shape().as_list()
+				#shape=tf.shape(hidden_pool2)
+				#print("conv layer 2 - ",hidden_pool2.get_shape().as_list())
+				reshape = tf.reshape(hidden_pool2, [shape[0], shape[1] * shape[2] * shape[3]])
+				#print(reshape.get_shape().as_list())
+				#hidden = tf.nn.dropout(tf.tanh(tf.matmul(reshape, layer3_weights) + layer3_biases),keep_prob)
+				hidden=	tf.nn.tanh(tf.matmul(reshape, layer3_weights) + layer3_biases)
+								
+				#print("fully connected layer",hidden.get_shape().as_list())
+				test_prediction=tf.matmul(hidden, layer4_weights) + layer4_biases
+				#print(hidden.eval()[0])
+				print(hidden2.eval())	
+				print(hidden.eval())'''
 				feed_dict_test = {tf_train_dataset : test_dataset, tf_train_labels : test_labels, keep_prob:1.0}
+				
 				test_prediction=session.run([train_prediction],feed_dict=feed_dict_test)
-				#print('Test prediction:', test_prediction[0])
+				#print(test_prediction)
+				#print(tf.nn.softmax(test_prediction).eval())	
+				
 				if (target_number>0):
 					
 					original=np.concatenate((np.array(range(all_labels[target_number]-1)),np.array([10])))
 					
 				else:
 					original=np.array(range(1,all_labels[target_number]+1))
-				
-				print(original.dot(test_labels[0]))
-				print('Test prediction:', test_prediction[0][0], test_labels[0])	
+				original_array=np.tile(original,(len(test_labels),1))
+				print("Actual output")
+				print(np.amax(np.multiply(original,test_labels),axis=1))
+				print("Prediction output")
+				print(original_array[np.arange(len(test_prediction)),np.argmax(test_prediction[0],axis=1)])	
+				#print(test_labels)
+				#print(test_prediction[0].argmax(axis=1))
+				#print(np.amax(np.multiply(test_prediction,test_labels)))
+			
+				#print('Test prediction:', test_prediction[0][5], test_labels[0])	
 				print('Test accuracy: %.1f%%' % accuracy.eval(feed_dict=feed_dict_test))
+
+
+
